@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Mini foro 😎</title>
+</head>
+<body style="font-family: Arial; text-align:center; margin-top:50px;">
+
+  <!-- LOGIN -->
+  <div id="login">
+    <h2>Iniciar sesión</h2>
+    <input id="user" placeholder="Usuario"><br><br>
+    <input id="pass" type="password" placeholder="Contraseña"><br><br>
+    <button onclick="login()">Entrar</button>
+
+    <p>¿No tienes cuenta?
+      <span onclick="mostrarRegistro()" style="color:blue;cursor:pointer;">Regístrate</span>
+    </p>
+
+    <p id="msgLogin"></p>
+  </div>
+
+  <!-- REGISTRO -->
+  <div id="registro" style="display:none;">
+    <h2>Registro</h2>
+    <input id="newUser" placeholder="Usuario"><br><br>
+    <input id="newPass" type="password" placeholder="Contraseña"><br><br>
+    <button onclick="registrar()">Crear cuenta</button><br><br>
+    <button onclick="volverLogin()">Volver</button>
+    <p id="msgReg"></p>
+  </div>
+
+  <!-- APP -->
+  <div id="app" style="display:none;">
+    <h2>Mini foro 😎</h2>
+
+    <input id="mensaje" placeholder="Escribe algo..."><br><br>
+    <button onclick="enviar()">Enviar</button>
+    <button onclick="botonInutil()">Botón inútil</button>
+
+    <h3>Mensajes:</h3>
+    <ul id="lista"></ul>
+  </div>
+
+  <!-- FIREBASE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
+      authDomain: "olax-50672.firebaseapp.com",
+      projectId: "olax-50672",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let usuarioActual = "";
+
+    // REGISTRO
+    window.registrar = function() {
+      let u = document.getElementById("newUser").value;
+      let p = document.getElementById("newPass").value;
+
+      if (u === "" || p === "") {
+        document.getElementById("msgReg").innerText = "No dejes vacío 💀";
+        return;
+      }
+
+      localStorage.setItem("user", u);
+      localStorage.setItem("pass", p);
+
+      document.getElementById("msgReg").innerText = "Cuenta creada 😎";
+    }
+
+    // LOGIN
+    window.login = function() {
+      let u = document.getElementById("user").value;
+      let p = document.getElementById("pass").value;
+
+      if (u === "" || p === "") {
+        document.getElementById("msgLogin").innerText = "Llena los campos xd";
+        return;
+      }
+
+      if (u === localStorage.getItem("user") && p === localStorage.getItem("pass")) {
+        usuarioActual = u;
+        document.getElementById("login").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        cargar();
+      } else {
+        document.getElementById("msgLogin").innerText = "Incorrecto...";
+      }
+    }
+
+    // MENSAJES
+    window.enviar = async function() {
+      let texto = document.getElementById("mensaje").value;
+
+      if (texto === "") return;
+
+      await addDoc(collection(db, "mensajes"), {
+        user: usuarioActual,
+        texto: texto
+      });
+
+      document.getElementById("mensaje").value = "";
+      location.reload();
+    }
+
+    async function cargar() {
+      const querySnapshot = await getDocs(collection(db, "mensajes"));
+      querySnapshot.forEach((doc) => {
+        let li = document.createElement("li");
+        li.innerText = doc.data().user + ": " + doc.data().texto;
+        document.getElementById("lista").appendChild(li);
+      });
+    }
+
+    // UI
+    window.mostrarRegistro = () => {
+      document.getElementById("login").style.display = "none";
+      document.getElementById("registro").style.display = "block";
+    }
+
+    window.volverLogin = () => {
+      document.getElementById("registro").style.display = "none";
+      document.getElementById("login").style.display = "block";
+    }
+
+    window.botonInutil = () => {
+      alert("No hizo nada… pero te sentiste poderoso 😎");
+    }
+
+  </script>
+
+</body>
+</html>
