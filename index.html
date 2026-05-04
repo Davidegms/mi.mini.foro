@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mini.foro.es</title>
+  <title>mini.foro.es</title>
 
   <style>
     body{
@@ -20,15 +20,6 @@
       width:220px;
       background:#141414;
       padding:10px;
-      overflow-y:auto;
-    }
-
-    .user{
-      padding:8px;
-      margin:5px 0;
-      background:#222;
-      border-radius:6px;
-      cursor:pointer;
     }
 
     #chat{
@@ -74,12 +65,6 @@
       border:none;
       background:#333;
       color:white;
-      cursor:pointer;
-    }
-
-    img{
-      max-width:180px;
-      border-radius:8px;
     }
   </style>
 </head>
@@ -87,18 +72,16 @@
 <body>
 
 <div id="login">
+  <h2>Entrar con gogle</h2>
   <button onclick="loginGoogle()">Entrar con Google</button>
-  <h2>Entrar con google</h2>
 </div>
 
 <div id="app" style="display:none;">
 
   <div id="container">
 
-    <!-- USUARIOS -->
     <div id="users"></div>
 
-    <!-- CHAT -->
     <div id="chat">
 
       <div id="msgs"></div>
@@ -121,12 +104,7 @@ import {
   getFirestore,
   collection,
   addDoc,
-  query,
-  onSnapshot,
-  where,
-  orderBy,
-  setDoc,
-  doc
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 import {
@@ -139,11 +117,7 @@ import {
 const firebaseConfig = {
   apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
   authDomain: "olax-50672.firebaseapp.com",
-  projectId: "olax-50672",
-  storageBucket: "olax-50672.firebasestorage.app",
-  gSenderId: "507709298695",
-  appId: "1:507709298695:web:baebb3be48d18786cd72a2"
-
+  projectId: "olax-50672"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -151,8 +125,6 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 let user=null;
-let mode="public";
-let chatId=null;
 
 /* LOGIN */
 window.loginGoogle = async function(){
@@ -161,54 +133,14 @@ window.loginGoogle = async function(){
 };
 
 /* LOGIN OK */
-onAuthStateChanged(auth, async (u)=>{
+onAuthStateChanged(auth,(u)=>{
   if(u){
     user=u;
-
     document.getElementById("login").style.display="none";
-    document.getElementById("app").style.display="block";
-
-    // guardar usuario en lista
-    await setDoc(doc(db,"users",u.uid),{
-      name:u.displayName,
-      uid:u.uid
-    });
-
-    loadUsers();
-    loadChat();
+    document.getElementById("app").style.display="flex";
+    loadMessages();
   }
 });
-
-/* LISTA DE USUARIOS */
-function loadUsers(){
-
-  const q=query(collection(db,"users"));
-
-  onSnapshot(q,(snap)=>{
-
-    const box=document.getElementById("users");
-    box.innerHTML="";
-
-    snap.forEach(d=>{
-
-      let u=d.data();
-
-      if(u.uid===user.uid) return;
-
-      let div=document.createElement("div");
-      div.className="user";
-      div.innerText=u.name;
-
-      div.onclick=()=>{
-        mode="private";
-        chatId=[user.uid,u.uid].sort().join("_");
-        loadChat();
-      };
-
-      box.appendChild(div);
-    });
-  });
-}
 
 /* ENVIAR MENSAJE */
 window.send = async function(){
@@ -217,44 +149,28 @@ window.send = async function(){
   if(!text) return;
 
   await addDoc(collection(db,"messages"),{
-    text,
+    text:text,
     user:user.displayName,
     uid:user.uid,
-    mode:mode,
-    chatId:chatId || "public",
     time:Date.now()
   });
 
   document.getElementById("text").value="";
 };
 
-/* CHAT */
-function loadChat(){
+/* CARGAR MENSAJES (SIN FILTROS QUE ROMPAN) */
+function loadMessages(){
 
-  let q;
+  const col = collection(db,"messages");
 
-  if(mode==="public"){
-    q=query(
-      collection(db,"messages"),
-      where("mode","==","public"),
-      orderBy("time")
-    );
-  }else{
-    q=query(
-      collection(db,"messages"),
-      where("chatId","==",chatId),
-      orderBy("time")
-    );
-  }
-
-  onSnapshot(q,(snap)=>{
+  onSnapshot(col,(snap)=>{
 
     const box=document.getElementById("msgs");
     box.innerHTML="";
 
     snap.forEach(doc=>{
 
-      let d=doc.data();
+      const d = doc.data();
 
       let div=document.createElement("div");
       div.classList.add("msg");
@@ -263,15 +179,12 @@ function loadChat(){
         div.classList.add("me");
       }
 
-      div.innerHTML=`
-        <b>${d.user}</b><br>
-        ${d.text}
-      `;
+      div.innerHTML = `<b>${d.user}</b><br>${d.text}`;
 
       box.appendChild(div);
     });
 
-    box.scrollTop=box.scrollHeight;
+    box.scrollTop = box.scrollHeight;
   });
 }
 
