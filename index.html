@@ -1,32 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>mini.foro.es.v23</title>
+  <title>Mini.foro.es</title>
 
   <style>
     body{
       margin:0;
-      font-family: Arial;
+      font-family:Arial;
       background:#0f0f0f;
-      color:#eee;
-    }
-
-    #top{
-      padding:10px;
-      background:#151515;
-      display:flex;
-      justify-content:space-between;
+      color:white;
     }
 
     #container{
       display:flex;
-      height:92vh;
+      height:100vh;
     }
 
-    #side{
+    #users{
       width:220px;
       background:#141414;
       padding:10px;
+      overflow-y:auto;
+    }
+
+    .user{
+      padding:8px;
+      margin:5px 0;
+      background:#222;
+      border-radius:6px;
+      cursor:pointer;
     }
 
     #chat{
@@ -42,9 +44,9 @@
     }
 
     .msg{
-      margin:5px 0;
-      padding:8px;
       background:#222;
+      margin:5px;
+      padding:8px;
       border-radius:6px;
     }
 
@@ -78,33 +80,34 @@
     img{
       max-width:180px;
       border-radius:8px;
-      margin-top:5px;
     }
   </style>
 </head>
 
 <body>
 
-<div id="top">
-  <div>Chat</div>
-  <div id="user"></div>
+<div id="login">
+  <button onclick="loginGoogle()">Entrar con Google</button>
+  <h2>Entrar con google</h2>
 </div>
 
-<div id="container">
+<div id="app" style="display:none;">
 
-  <div id="side">
-    <div onclick="setMode('public')">Sala pública</div>
-    <div onclick="startPrivate()">Privado</div>
-  </div>
+  <div id="container">
 
-  <div id="chat">
+    <!-- USUARIOS -->
+    <div id="users"></div>
 
-    <div id="msgs"></div>
+    <!-- CHAT -->
+    <div id="chat">
 
-    <div id="input">
-      <input id="text" placeholder="mensaje...">
-      <input type="file" id="img">
-      <button onclick="send()">→</button>
+      <div id="msgs"></div>
+
+      <div id="input">
+        <input id="text" placeholder="mensaje...">
+        <button onclick="send()">→</button>
+      </div>
+
     </div>
 
   </div>
@@ -120,8 +123,10 @@ import {
   addDoc,
   query,
   onSnapshot,
+  where,
   orderBy,
-  where
+  setDoc,
+  doc
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 import {
@@ -131,124 +136,136 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.0.0/firebase-storage.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
   authDomain: "olax-50672.firebaseapp.com",
   projectId: "olax-50672",
   storageBucket: "olax-50672.firebasestorage.app",
-  messagingSenderId: "507709298695",
+  gSenderId: "507709298695",
   appId: "1:507709298695:web:baebb3be48d18786cd72a2"
+
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
 
 let user=null;
 let mode="public";
 let chatId=null;
 
-/* LOGIN AUTOMATICO */
-const provider=new GoogleAuthProvider();
-signInWithPopup(auth,provider);
+/* LOGIN */
+window.loginGoogle = async function(){
+  const provider = new GoogleAuthProvider();
+  await signInWithPopup(auth,provider);
+};
 
-/* USER */
-onAuthStateChanged(auth,(u)=>{
+/* LOGIN OK */
+onAuthStateChanged(auth, async (u)=>{
   if(u){
     user=u;
-    document.getElementById("user").innerText=u.displayName;
-    load();
+
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").style.display="block";
+
+    // guardar usuario en lista
+    await setDoc(doc(db,"users",u.uid),{
+      name:u.displayName,
+      uid:u.uid
+    });
+
+    loadUsers();
+    loadChat();
   }
 });
 
-/* MODE */
-window.setMode=function(m){
-  mode=m;
-  load();
-};
+/* LISTA DE USUARIOS */
+function loadUsers(){
 
-/* PRIVATE SIMPLE */
-window.startPrivate=function(){
-  let other=prompt("Email del usuario");
-  chatId=[user.email,other].sort().join("_");
-  mode="private";
-  load();
-};
-
-/* SEND */
-window.send=async function(){
-
-  let text=document.getElementById("text").value.trim();
-  let file=document.getElementById("img").files[0];
-
-  let img=null;
-
-  if(file){
-    let r=ref(storage,"img/"+Date.now());
-    await uploadBytes(r,file);
-    img=await getDownloadURL(r);
-  }
-
-  if(!text && !img) return;
-
-  let data={
-    text,
-    user:user.displayName,
-    photo:user.photoURL,
-    img,
-    time:Date.now(),
-    mode:mode
-  };
-
-  if(mode==="private") data.chatId=chatId;
-
-  await addDoc(collection(db,"messages"),data);
-
-  document.getElementById("text").value="";
-  document.getElementById("img").value="";
-};
-
-/* LOAD */
-function load(){
-
-  let q;
-
-  if(mode==="public"){
-    q=query(collection(db,"messages"),
-    where("mode","==","public"),
-    orderBy("time"));
-  }else{
-    q=query(collection(db,"messages"),
-    where("chatId","==",chatId),
-    orderBy("time"));
-  }
+  const q=query(collection(db,"users"));
 
   onSnapshot(q,(snap)=>{
 
-    let box=document.getElementById("msgs");
+    const box=document.getElementById("users");
     box.innerHTML="";
 
     snap.forEach(d=>{
 
-      let m=d.data();
+      let u=d.data();
+
+      if(u.uid===user.uid) return;
 
       let div=document.createElement("div");
-      div.className="msg";
+      div.className="user";
+      div.innerText=u.name;
 
-      if(m.user===user.displayName) div.classList.add("me");
+      div.onclick=()=>{
+        mode="private";
+        chatId=[user.uid,u.uid].sort().join("_");
+        loadChat();
+      };
+
+      box.appendChild(div);
+    });
+  });
+}
+
+/* ENVIAR MENSAJE */
+window.send = async function(){
+
+  let text=document.getElementById("text").value.trim();
+  if(!text) return;
+
+  await addDoc(collection(db,"messages"),{
+    text,
+    user:user.displayName,
+    uid:user.uid,
+    mode:mode,
+    chatId:chatId || "public",
+    time:Date.now()
+  });
+
+  document.getElementById("text").value="";
+};
+
+/* CHAT */
+function loadChat(){
+
+  let q;
+
+  if(mode==="public"){
+    q=query(
+      collection(db,"messages"),
+      where("mode","==","public"),
+      orderBy("time")
+    );
+  }else{
+    q=query(
+      collection(db,"messages"),
+      where("chatId","==",chatId),
+      orderBy("time")
+    );
+  }
+
+  onSnapshot(q,(snap)=>{
+
+    const box=document.getElementById("msgs");
+    box.innerHTML="";
+
+    snap.forEach(doc=>{
+
+      let d=doc.data();
+
+      let div=document.createElement("div");
+      div.classList.add("msg");
+
+      if(d.uid===user.uid){
+        div.classList.add("me");
+      }
 
       div.innerHTML=`
-        <b>${m.user}</b><br>
-        ${m.text||""}<br>
-        ${m.img?`<img src="${m.img}">`:""}
+        <b>${d.user}</b><br>
+        ${d.text}
       `;
 
       box.appendChild(div);
