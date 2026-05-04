@@ -1,86 +1,127 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chat Pro 😎</title>
+  <title>mini.foro.es.v23</title>
+
   <style>
-    body {
+    body{
+      margin:0;
       font-family: Arial;
-      background: #111;
-      color: white;
-      text-align: center;
+      background:#0f0f0f;
+      color:#eee;
     }
 
-    #chat {
-      height: 400px;
-      overflow-y: auto;
-      background: #222;
-      padding: 10px;
-      border-radius: 10px;
-      width: 90%;
-      max-width: 500px;
-      margin: auto;
-      text-align: left;
+    #top{
+      padding:10px;
+      background:#151515;
+      display:flex;
+      justify-content:space-between;
     }
 
-    .msg {
-      background: #333;
-      margin: 5px;
-      padding: 8px;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    #container{
+      display:flex;
+      height:92vh;
     }
 
-    .me {
-      background: #075E54;
+    #side{
+      width:220px;
+      background:#141414;
+      padding:10px;
     }
 
-    img {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
+    #chat{
+      flex:1;
+      display:flex;
+      flex-direction:column;
     }
 
-    input {
-      padding: 10px;
-      width: 70%;
+    #msgs{
+      flex:1;
+      overflow-y:auto;
+      padding:10px;
     }
 
-    button {
-      padding: 10px;
-      background: #25D366;
-      border: none;
-      color: white;
-      cursor: pointer;
+    .msg{
+      margin:5px 0;
+      padding:8px;
+      background:#222;
+      border-radius:6px;
+    }
+
+    .me{
+      background:#075E54;
+    }
+
+    #input{
+      display:flex;
+      background:#151515;
+      padding:10px;
+    }
+
+    input{
+      flex:1;
+      padding:10px;
+      border:none;
+      outline:none;
+      background:#222;
+      color:white;
+    }
+
+    button{
+      padding:10px;
+      border:none;
+      background:#333;
+      color:white;
+      cursor:pointer;
+    }
+
+    img{
+      max-width:180px;
+      border-radius:8px;
+      margin-top:5px;
     }
   </style>
 </head>
 
 <body>
 
-<h2>Chat Firebase 😎</h2>
-
-<div id="loginBox">
-  <button onclick="loginGoogle()">Entrar con Google</button>
+<div id="top">
+  <div>Chat</div>
+  <div id="user"></div>
 </div>
 
-<div id="chatBox" style="display:none;">
-  <div id="chat"></div>
+<div id="container">
 
-  <input id="text" placeholder="Escribe mensaje...">
-  <button onclick="send()">Enviar</button>
+  <div id="side">
+    <div onclick="setMode('public')">Sala pública</div>
+    <div onclick="startPrivate()">Privado</div>
+  </div>
+
+  <div id="chat">
+
+    <div id="msgs"></div>
+
+    <div id="input">
+      <input id="text" placeholder="mensaje...">
+      <input type="file" id="img">
+      <button onclick="send()">→</button>
+    </div>
+
+  </div>
+
 </div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import {
   getFirestore,
   collection,
   addDoc,
-  orderBy,
   query,
-  onSnapshot
+  onSnapshot,
+  orderBy,
+  where
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 import {
@@ -89,6 +130,13 @@ import {
   signInWithPopup,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.0.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
@@ -102,67 +150,114 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 
-let user = null;
+let user=null;
+let mode="public";
+let chatId=null;
 
-/* LOGIN GOOGLE */
-window.loginGoogle = async function () {
-  const provider = new GoogleAuthProvider();
-  await signInWithPopup(auth, provider);
-};
+/* LOGIN AUTOMATICO */
+const provider=new GoogleAuthProvider();
+signInWithPopup(auth,provider);
 
-/* DETECTA USUARIO */
-onAuthStateChanged(auth, (u) => {
-  if (u) {
-    user = u;
-
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("chatBox").style.display = "block";
-
-    loadChat();
+/* USER */
+onAuthStateChanged(auth,(u)=>{
+  if(u){
+    user=u;
+    document.getElementById("user").innerText=u.displayName;
+    load();
   }
 });
 
-/* ENVIAR MENSAJE */
-window.send = async function () {
-  let text = document.getElementById("text").value.trim();
-  if (!text) return;
-
-  await addDoc(collection(db, "mensajes"), {
-    text: text,
-    name: user.displayName,
-    photo: user.photoURL,
-    time: Date.now()
-  });
-
-  document.getElementById("text").value = "";
+/* MODE */
+window.setMode=function(m){
+  mode=m;
+  load();
 };
 
-/* TIEMPO REAL */
-function loadChat() {
-  const q = query(collection(db, "mensajes"), orderBy("time"));
+/* PRIVATE SIMPLE */
+window.startPrivate=function(){
+  let other=prompt("Email del usuario");
+  chatId=[user.email,other].sort().join("_");
+  mode="private";
+  load();
+};
 
-  onSnapshot(q, (snap) => {
-    const chat = document.getElementById("chat");
-    chat.innerHTML = "";
+/* SEND */
+window.send=async function(){
 
-    snap.forEach((doc) => {
-      let d = doc.data();
+  let text=document.getElementById("text").value.trim();
+  let file=document.getElementById("img").files[0];
 
-      let div = document.createElement("div");
-      div.classList.add("msg");
+  let img=null;
 
-      div.innerHTML = `
-        <img src="${d.photo}">
-        <b>${d.name}</b>: ${d.text}
+  if(file){
+    let r=ref(storage,"img/"+Date.now());
+    await uploadBytes(r,file);
+    img=await getDownloadURL(r);
+  }
+
+  if(!text && !img) return;
+
+  let data={
+    text,
+    user:user.displayName,
+    photo:user.photoURL,
+    img,
+    time:Date.now(),
+    mode:mode
+  };
+
+  if(mode==="private") data.chatId=chatId;
+
+  await addDoc(collection(db,"messages"),data);
+
+  document.getElementById("text").value="";
+  document.getElementById("img").value="";
+};
+
+/* LOAD */
+function load(){
+
+  let q;
+
+  if(mode==="public"){
+    q=query(collection(db,"messages"),
+    where("mode","==","public"),
+    orderBy("time"));
+  }else{
+    q=query(collection(db,"messages"),
+    where("chatId","==",chatId),
+    orderBy("time"));
+  }
+
+  onSnapshot(q,(snap)=>{
+
+    let box=document.getElementById("msgs");
+    box.innerHTML="";
+
+    snap.forEach(d=>{
+
+      let m=d.data();
+
+      let div=document.createElement("div");
+      div.className="msg";
+
+      if(m.user===user.displayName) div.classList.add("me");
+
+      div.innerHTML=`
+        <b>${m.user}</b><br>
+        ${m.text||""}<br>
+        ${m.img?`<img src="${m.img}">`:""}
       `;
 
-      chat.appendChild(div);
+      box.appendChild(div);
     });
 
-    chat.scrollTop = chat.scrollHeight;
+    box.scrollTop=box.scrollHeight;
   });
 }
+
 </script>
 
 </body>
