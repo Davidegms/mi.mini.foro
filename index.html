@@ -1,138 +1,186 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Mini foro 😎</title>
+  <title>Chat estilo WhatsApp 😎</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: white;
+      text-align: center;
+    }
+
+    .box {
+      width: 90%;
+      max-width: 500px;
+      margin: auto;
+    }
+
+    input {
+      padding: 10px;
+      width: 80%;
+      margin: 5px;
+      border-radius: 10px;
+      border: none;
+    }
+
+    button {
+      padding: 10px;
+      border-radius: 10px;
+      border: none;
+      background: #25D366;
+      color: white;
+      cursor: pointer;
+      margin: 5px;
+    }
+
+    #chat {
+      height: 400px;
+      overflow-y: auto;
+      background: #222;
+      padding: 10px;
+      border-radius: 10px;
+      margin-top: 10px;
+      text-align: left;
+    }
+
+    .msg {
+      background: #333;
+      padding: 8px;
+      margin: 5px;
+      border-radius: 8px;
+    }
+
+    .me {
+      background: #075E54;
+      text-align: right;
+    }
+  </style>
 </head>
-<body style="font-family: Arial; text-align:center; margin-top:50px;">
+
+<body>
+
+<div class="box">
 
   <!-- LOGIN -->
-  <div id="login">
-    <h2>Iniciar sesión</h2>
-    <input id="user" placeholder="Usuario"><br><br>
-    <input id="pass" type="password" placeholder="Contraseña"><br><br>
+  <div id="loginBox">
+    <h2>Login 🔐</h2>
+    <input id="user" placeholder="Usuario">
+    <input id="pass" type="password" placeholder="Contraseña">
+    <br>
     <button onclick="login()">Entrar</button>
-
-    <p>¿No tienes cuenta?
-      <span onclick="mostrarRegistro()" style="color:blue;cursor:pointer;">Regístrate</span>
-    </p>
-
-    <p id="msgLogin"></p>
+    <p id="msg"></p>
   </div>
 
-  <!-- REGISTRO -->
-  <div id="registro" style="display:none;">
-    <h2>Registro</h2>
-    <input id="newUser" placeholder="Usuario"><br><br>
-    <input id="newPass" type="password" placeholder="Contraseña"><br><br>
-    <button onclick="registrar()">Crear cuenta</button><br><br>
-    <button onclick="volverLogin()">Volver</button>
-    <p id="msgReg"></p>
+  <!-- CHAT -->
+  <div id="chatBox" style="display:none;">
+    <h2>Chat 💬</h2>
+
+    <div id="chat"></div>
+
+    <input id="text" placeholder="Escribe mensaje...">
+    <button onclick="send()">Enviar</button>
   </div>
 
-  <!-- APP -->
-  <div id="app" style="display:none;">
-    <h2>Mini foro 😎</h2>
+</div>
 
-    <input id="mensaje" placeholder="Escribe algo..."><br><br>
-    <button onclick="enviar()">Enviar</button>
-    <button onclick="botonInutil()">Botón inútil</button>
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy
+} from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
-    <h3>Mensajes:</h3>
-    <ul id="lista"></ul>
-  </div>
+const firebaseConfig = {
+  apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
+  authDomain: "olax-50672.firebaseapp.com",
+  projectId: "olax-50672",
+  storageBucket: "olax-50672.firebasestorage.app",
+  messagingSenderId: "507709298695",
+  appId: "1:507709298695:web:baebb3be48d18786cd72a2"
+};
 
-  <!-- FIREBASE -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
-      authDomain: "olax-50672.firebaseapp.com",
-      projectId: "olax-50672",
-    };
+let userActual = "";
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+/* LOGIN SIMPLE */
+window.login = function () {
+  let u = document.getElementById("user").value;
+  let p = document.getElementById("pass").value;
 
-    let usuarioActual = "";
+  if (!u || !p) {
+    document.getElementById("msg").innerText = "Llena todo 💀";
+    return;
+  }
 
-    // REGISTRO
-    window.registrar = function() {
-      let u = document.getElementById("newUser").value;
-      let p = document.getElementById("newPass").value;
+  let savedU = localStorage.getItem("user");
+  let savedP = localStorage.getItem("pass");
 
-      if (u === "" || p === "") {
-        document.getElementById("msgReg").innerText = "No dejes vacío 💀";
-        return;
+  if (!savedU) {
+    localStorage.setItem("user", u);
+    localStorage.setItem("pass", p);
+  }
+
+  if (u === localStorage.getItem("user") && p === localStorage.getItem("pass")) {
+    userActual = u;
+
+    document.getElementById("loginBox").style.display = "none";
+    document.getElementById("chatBox").style.display = "block";
+
+    startChat();
+  } else {
+    document.getElementById("msg").innerText = "Incorrecto 💀";
+  }
+};
+
+/* ENVIAR MENSAJE */
+window.send = async function () {
+  let text = document.getElementById("text").value.trim();
+  if (!text) return;
+
+  await addDoc(collection(db, "mensajes"), {
+    user: userActual,
+    text: text,
+    time: Date.now()
+  });
+
+  document.getElementById("text").value = "";
+};
+
+/* CHAT EN TIEMPO REAL */
+function startChat() {
+  const chat = document.getElementById("chat");
+
+  const q = query(collection(db, "mensajes"), orderBy("time"));
+
+  onSnapshot(q, (snapshot) => {
+    chat.innerHTML = "";
+
+    snapshot.forEach((doc) => {
+      let d = doc.data();
+
+      let div = document.createElement("div");
+      div.classList.add("msg");
+
+      if (d.user === userActual) {
+        div.classList.add("me");
       }
 
-      localStorage.setItem("user", u);
-      localStorage.setItem("pass", p);
+      div.innerText = d.user + ": " + d.text;
+      chat.appendChild(div);
+    });
 
-      document.getElementById("msgReg").innerText = "Cuenta creada 😎";
-    }
-
-    // LOGIN
-    window.login = function() {
-      let u = document.getElementById("user").value;
-      let p = document.getElementById("pass").value;
-
-      if (u === "" || p === "") {
-        document.getElementById("msgLogin").innerText = "Llena los campos xd";
-        return;
-      }
-
-      if (u === localStorage.getItem("user") && p === localStorage.getItem("pass")) {
-        usuarioActual = u;
-        document.getElementById("login").style.display = "none";
-        document.getElementById("app").style.display = "block";
-        cargar();
-      } else {
-        document.getElementById("msgLogin").innerText = "Incorrecto...";
-      }
-    }
-
-    // MENSAJES
-    window.enviar = async function() {
-      let texto = document.getElementById("mensaje").value;
-
-      if (texto === "") return;
-
-      await addDoc(collection(db, "mensajes"), {
-        user: usuarioActual,
-        texto: texto
-      });
-
-      document.getElementById("mensaje").value = "";
-      location.reload();
-    }
-
-    async function cargar() {
-      const querySnapshot = await getDocs(collection(db, "mensajes"));
-      querySnapshot.forEach((doc) => {
-        let li = document.createElement("li");
-        li.innerText = doc.data().user + ": " + doc.data().texto;
-        document.getElementById("lista").appendChild(li);
-      });
-    }
-
-    // UI
-    window.mostrarRegistro = () => {
-      document.getElementById("login").style.display = "none";
-      document.getElementById("registro").style.display = "block";
-    }
-
-    window.volverLogin = () => {
-      document.getElementById("registro").style.display = "none";
-      document.getElementById("login").style.display = "block";
-    }
-
-    window.botonInutil = () => {
-      alert("No hizo nada… pero te sentiste poderoso 😎");
-    }
-
-  </script>
+    chat.scrollTop = chat.scrollHeight;
+  });
+}
+</script>
 
 </body>
 </html>
