@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>mini.foro.es</title>
+  <title>Chat limpio 😎</title>
 
   <style>
     body{
@@ -11,21 +11,23 @@
       color:white;
     }
 
-    #container{
-      display:flex;
+    #login{
       height:100vh;
-    }
-
-    #users{
-      width:220px;
-      background:#141414;
-      padding:10px;
-    }
-
-    #chat{
-      flex:1;
       display:flex;
+      justify-content:center;
+      align-items:center;
       flex-direction:column;
+    }
+
+    #app{
+      display:none;
+      height:100vh;
+      flex-direction:column;
+    }
+
+    #top{
+      padding:10px;
+      background:#151515;
     }
 
     #msgs{
@@ -47,8 +49,8 @@
 
     #input{
       display:flex;
-      background:#151515;
       padding:10px;
+      background:#151515;
     }
 
     input{
@@ -65,34 +67,29 @@
       border:none;
       background:#333;
       color:white;
+      cursor:pointer;
     }
   </style>
 </head>
 
 <body>
 
+<!-- LOGIN -->
 <div id="login">
-  <h2>Entrar con gogle</h2>
+  <h2>Entrar</h2>
   <button onclick="loginGoogle()">Entrar con Google</button>
 </div>
 
-<div id="app" style="display:none;">
+<!-- APP -->
+<div id="app">
 
-  <div id="container">
+  <div id="top">Chat público 😎</div>
 
-    <div id="users"></div>
+  <div id="msgs"></div>
 
-    <div id="chat">
-
-      <div id="msgs"></div>
-
-      <div id="input">
-        <input id="text" placeholder="mensaje...">
-        <button onclick="send()">→</button>
-      </div>
-
-    </div>
-
+  <div id="input">
+    <input id="text" placeholder="Escribe mensaje...">
+    <button onclick="send()">Enviar</button>
   </div>
 
 </div>
@@ -104,7 +101,9 @@ import {
   getFirestore,
   collection,
   addDoc,
-  onSnapshot
+  query,
+  onSnapshot,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
 import {
@@ -115,7 +114,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
+  apiKey: "TU_API_KEY",
   authDomain: "olax-50672.firebaseapp.com",
   projectId: "olax-50672"
 };
@@ -132,12 +131,14 @@ window.loginGoogle = async function(){
   await signInWithPopup(auth,provider);
 };
 
-/* LOGIN OK */
+/* CUANDO YA ENTRA */
 onAuthStateChanged(auth,(u)=>{
   if(u){
     user=u;
+
     document.getElementById("login").style.display="none";
     document.getElementById("app").style.display="flex";
+
     loadMessages();
   }
 });
@@ -151,19 +152,21 @@ window.send = async function(){
   await addDoc(collection(db,"messages"),{
     text:text,
     user:user.displayName,
-    uid:user.uid,
     time:Date.now()
   });
 
   document.getElementById("text").value="";
 };
 
-/* CARGAR MENSAJES (SIN FILTROS QUE ROMPAN) */
+/* CARGAR MENSAJES ORDENADOS */
 function loadMessages(){
 
-  const col = collection(db,"messages");
+  const q = query(
+    collection(db,"messages"),
+    orderBy("time","asc")
+  );
 
-  onSnapshot(col,(snap)=>{
+  onSnapshot(q,(snap)=>{
 
     const box=document.getElementById("msgs");
     box.innerHTML="";
@@ -172,10 +175,10 @@ function loadMessages(){
 
       const d = doc.data();
 
-      let div=document.createElement("div");
+      const div=document.createElement("div");
       div.classList.add("msg");
 
-      if(d.uid===user.uid){
+      if(d.user===user.displayName){
         div.classList.add("me");
       }
 
