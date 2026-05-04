@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chat estilo WhatsApp 😎</title>
+  <title>Chat Pro 😎</title>
   <style>
     body {
       font-family: Arial;
@@ -10,94 +10,88 @@
       text-align: center;
     }
 
-    .box {
-      width: 90%;
-      max-width: 500px;
-      margin: auto;
-    }
-
-    input {
-      padding: 10px;
-      width: 80%;
-      margin: 5px;
-      border-radius: 10px;
-      border: none;
-    }
-
-    button {
-      padding: 10px;
-      border-radius: 10px;
-      border: none;
-      background: #25D366;
-      color: white;
-      cursor: pointer;
-      margin: 5px;
-    }
-
     #chat {
       height: 400px;
       overflow-y: auto;
       background: #222;
       padding: 10px;
       border-radius: 10px;
-      margin-top: 10px;
+      width: 90%;
+      max-width: 500px;
+      margin: auto;
       text-align: left;
     }
 
     .msg {
       background: #333;
-      padding: 8px;
       margin: 5px;
+      padding: 8px;
       border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .me {
       background: #075E54;
-      text-align: right;
+    }
+
+    img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+    }
+
+    input {
+      padding: 10px;
+      width: 70%;
+    }
+
+    button {
+      padding: 10px;
+      background: #25D366;
+      border: none;
+      color: white;
+      cursor: pointer;
     }
   </style>
 </head>
 
 <body>
 
-<div class="box">
+<h2>Chat Firebase 😎</h2>
 
-  <!-- LOGIN -->
-  <div id="loginBox">
-    <h2>Login 🔐</h2>
-    <input id="user" placeholder="Usuario">
-    <input id="pass" type="password" placeholder="Contraseña">
-    <br>
-    <button onclick="login()">Entrar</button>
-    <p id="msg"></p>
-  </div>
-
-  <!-- CHAT -->
-  <div id="chatBox" style="display:none;">
-    <h2>Chat 💬</h2>
-
-    <div id="chat"></div>
-
-    <input id="text" placeholder="Escribe mensaje...">
-    <button onclick="send()">Enviar</button>
-  </div>
-
+<div id="loginBox">
+  <button onclick="loginGoogle()">Entrar con Google</button>
 </div>
 
-<!-- FIREBASE -->
+<div id="chatBox" style="display:none;">
+  <div id="chat"></div>
+
+  <input id="text" placeholder="Escribe mensaje...">
+  <button onclick="send()">Enviar</button>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
 import {
   getFirestore,
   collection,
   addDoc,
-  onSnapshot,
+  orderBy,
   query,
-  orderBy
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
 
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js";
+
 const firebaseConfig = {
-  apiKey: "AIzaSyDhw9i6jq4bA769gkP__hLxGT9nJ0OFs-k",
+  apiKey: "TU_API_KEY",
   authDomain: "olax-50672.firebaseapp.com",
   projectId: "olax-50672",
   storageBucket: "olax-50672.firebasestorage.app",
@@ -107,38 +101,27 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-let userActual = "";
+let user = null;
 
-/* LOGIN SIMPLE */
-window.login = function () {
-  let u = document.getElementById("user").value;
-  let p = document.getElementById("pass").value;
+/* LOGIN GOOGLE */
+window.loginGoogle = async function () {
+  const provider = new GoogleAuthProvider();
+  await signInWithPopup(auth, provider);
+};
 
-  if (!u || !p) {
-    document.getElementById("msg").innerText = "Llena todo 💀";
-    return;
-  }
-
-  let savedU = localStorage.getItem("user");
-  let savedP = localStorage.getItem("pass");
-
-  if (!savedU) {
-    localStorage.setItem("user", u);
-    localStorage.setItem("pass", p);
-  }
-
-  if (u === localStorage.getItem("user") && p === localStorage.getItem("pass")) {
-    userActual = u;
+/* DETECTA USUARIO */
+onAuthStateChanged(auth, (u) => {
+  if (u) {
+    user = u;
 
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("chatBox").style.display = "block";
 
-    startChat();
-  } else {
-    document.getElementById("msg").innerText = "Incorrecto 💀";
+    loadChat();
   }
-};
+});
 
 /* ENVIAR MENSAJE */
 window.send = async function () {
@@ -146,34 +129,34 @@ window.send = async function () {
   if (!text) return;
 
   await addDoc(collection(db, "mensajes"), {
-    user: userActual,
     text: text,
+    name: user.displayName,
+    photo: user.photoURL,
     time: Date.now()
   });
 
   document.getElementById("text").value = "";
 };
 
-/* CHAT EN TIEMPO REAL */
-function startChat() {
-  const chat = document.getElementById("chat");
-
+/* TIEMPO REAL */
+function loadChat() {
   const q = query(collection(db, "mensajes"), orderBy("time"));
 
-  onSnapshot(q, (snapshot) => {
+  onSnapshot(q, (snap) => {
+    const chat = document.getElementById("chat");
     chat.innerHTML = "";
 
-    snapshot.forEach((doc) => {
+    snap.forEach((doc) => {
       let d = doc.data();
 
       let div = document.createElement("div");
       div.classList.add("msg");
 
-      if (d.user === userActual) {
-        div.classList.add("me");
-      }
+      div.innerHTML = `
+        <img src="${d.photo}">
+        <b>${d.name}</b>: ${d.text}
+      `;
 
-      div.innerText = d.user + ": " + d.text;
       chat.appendChild(div);
     });
 
